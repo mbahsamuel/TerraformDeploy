@@ -1,0 +1,77 @@
+# 1. Update the ubuntu server
+# sudo apt update
+
+# 2.install Java
+# sudo apt install openjdk-11-jdk
+
+# 3. Install Jenkins
+# curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+  # echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  # https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  # /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+# sudo apt-get update
+
+# sudo apt-get install jenkins  
+# sudo systemctl enable jenkins
+  
+# 4. install pip
+# sudo apt install python3-pip
+
+# 5. Install terraform
+# curl https://apt.releases.hashicorp.com/gpg | gpg --dearmor > hashicorp.gpg
+# sudo install -o root -g root -m 644 hashicorp.gpg /etc/apt/trusted.gpg.d/
+# sudo apt-add-repository "deb [arch=$(dpkg --print-architecture)] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+# sudo apt install terraform
+
+# 6. Install terraform plugin in jenkins and add terraform path in Global Tool Configuration with add path /usr/bin/terraform
+
+
+# 7. Create jenkins item and add jenkind pipeline grovvy script
+
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+               checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mbahsamuel/terraform-pipeline.git']]])
+            }
+        }
+        stage ('install checkov') {
+            steps {
+                sh 'pip3 install checkov'
+                sh '/var/lib/jenkins/.local/bin/checkov --version'
+            }
+        }
+        stage('Checkov') {
+            steps {
+                sh '/var/lib/jenkins/.local/bin/checkov  --version'
+                sh 'echo ${WORKSPACE}'
+                sh '/var/lib/jenkins/.local/bin/checkov -d .  -o junitxml  --output-file-path console'
+                junit '${WORKSPACE}/console/*.xml'
+            }
+        }
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan'
+            }
+        }
+        stage('Terraform Apply') {
+            steps {
+                input 'Deploy to AWS?'
+                sh 'terraform apply -auto-approve'
+            }
+        }
+    }
+}
+
+
+
